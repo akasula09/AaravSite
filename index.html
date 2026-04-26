@@ -217,6 +217,8 @@
             cursor: pointer;
             font-size: 0.95em;
             transition: all 0.3s;
+            margin-right: 10px;
+            margin-bottom: 10px;
         }
 
         .add-content-button:hover {
@@ -243,6 +245,42 @@
             background: rgba(231, 76, 60, 1);
             transform: translateY(-2px);
             box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+        }
+
+        /* Backup Buttons */
+        .backup-section {
+            background: rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            border-radius: 15px;
+            padding: 20px;
+            margin-bottom: 50px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .backup-button {
+            background: rgba(255, 255, 255, 0.9);
+            color: #667eea;
+            border: none;
+            padding: 12px 25px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 0.95em;
+            font-weight: 600;
+            transition: all 0.3s;
+            box-shadow: 0 5px 15px rgba(0,0,0,0.2);
+        }
+
+        .backup-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(0,0,0,0.3);
+            background: white;
+        }
+
+        #loadFileInput {
+            display: none;
         }
 
         /* Modal */
@@ -332,6 +370,13 @@
 
         .error-message {
             color: #e74c3c;
+            font-size: 0.9em;
+            margin-top: 10px;
+            text-align: center;
+        }
+
+        .success-message {
+            color: #27ae60;
             font-size: 0.9em;
             margin-top: 10px;
             text-align: center;
@@ -482,6 +527,14 @@
                 padding: 8px 15px;
                 font-size: 0.8em;
             }
+
+            .backup-section {
+                flex-direction: column;
+            }
+
+            .backup-button {
+                width: 100%;
+            }
         }
     </style>
 </head>
@@ -514,6 +567,13 @@
             <button class="cta-button" onclick="scrollToYears()">📖 Read My Entries</button>
         </div>
 
+        <!-- Backup/Restore Section -->
+        <div class="backup-section">
+            <button class="backup-button" onclick="downloadBackup()">💾 Download Backup</button>
+            <button class="backup-button" onclick="triggerFileUpload()">📂 Load Backup</button>
+            <input type="file" id="loadFileInput" accept=".txt" onchange="loadBackup(event)">
+        </div>
+
         <h2 class="section-title">🗓️ Select Year</h2>
         <div class="slider-container">
             <div class="slider" id="yearSlider"></div>
@@ -544,6 +604,7 @@
                 <button class="modal-button cancel-button" onclick="closeAddModal()">Cancel</button>
                 <button class="modal-button save-button" onclick="saveEntry()">Save Entry</button>
             </div>
+            <div id="saveMessage"></div>
         </div>
     </div>
 
@@ -627,12 +688,15 @@
             }
         }
 
-        // Generate week buttons (1-52)
+        // Generate week buttons
         function generateWeeks() {
             const weekSlider = document.getElementById('weekSlider');
             weekSlider.innerHTML = '';
 
-            for (let week = 1; week <= 52; week++) {
+            let startWeek = currentYear === 2026 ? 16 : 1;
+            let endWeek = 52;
+
+            for (let week = startWeek; week <= endWeek; week++) {
                 const button = document.createElement('button');
                 button.className = `week-button ${week === currentWeek ? 'active' : ''}`;
                 button.textContent = `W${week}`;
@@ -644,7 +708,7 @@
         // Select a year
         function selectYear(year) {
             currentYear = year;
-            currentWeek = 1;
+            currentWeek = currentYear === 2026 ? 16 : 1;
             generateWeeks();
             updateYearButtons();
             displayContent();
@@ -677,19 +741,32 @@
             });
         }
 
+        // Check if date is before website creation
+        function isBeforeWebsiteCreation(year, week) {
+            if (year < 2026) return true;
+            if (year === 2026 && week < 16) return true;
+            return false;
+        }
+
         // Display content for selected year and week
         function displayContent() {
             const key = `${currentYear}-${currentWeek}`;
             const contentDisplay = document.getElementById('contentDisplay');
 
-            if (entries[key]) {
+            if (isBeforeWebsiteCreation(currentYear, currentWeek)) {
+                contentDisplay.innerHTML = `
+                    <div class="empty-state">
+                        <p>📅 The website did not exist yet.</p>
+                    </div>
+                `;
+            } else if (entries[key]) {
                 const entry = entries[key];
                 contentDisplay.innerHTML = `
                     <h3>${entry.title}</h3>
                     <p>${entry.text}</p>
                     ${entry.image ? `<img src="${entry.image}" alt="Week entry">` : ''}
                     <button class="add-content-button" onclick="openEditModal('${key}')">✏️ Edit</button>
-                    <button class="add-content-button" style="background: #e74c3c; margin-left: 10px;" onclick="deleteEntry('${key}')">🗑️ Delete</button>
+                    <button class="add-content-button" style="background: #e74c3c;" onclick="deleteEntry('${key}')">🗑️ Delete</button>
                 `;
             } else {
                 contentDisplay.innerHTML = `
@@ -706,6 +783,7 @@
             document.getElementById('addModal').style.display = 'block';
             document.getElementById('entryTitle').value = '';
             document.getElementById('entryText').value = '';
+            document.getElementById('saveMessage').textContent = '';
         }
 
         // Open modal for editing entry
@@ -715,6 +793,7 @@
             document.getElementById('entryText').value = entry.text;
             document.getElementById('addModal').dataset.editKey = key;
             document.getElementById('addModal').style.display = 'block';
+            document.getElementById('saveMessage').textContent = '';
         }
 
         // Close modal
@@ -754,6 +833,57 @@
                 localStorage.setItem('weeklyEntries', JSON.stringify(entries));
                 displayContent();
             }
+        }
+
+        // Download backup as .txt file
+        function downloadBackup() {
+            const dataToDownload = JSON.stringify(entries, null, 2);
+            const element = document.createElement('a');
+            element.setAttribute('href', 'data:text/plain;charset=utf-8,' + encodeURIComponent(dataToDownload));
+            element.setAttribute('download', `journal-backup-${new Date().toISOString().split('T')[0]}.txt`);
+            element.style.display = 'none';
+            document.body.appendChild(element);
+            element.click();
+            document.body.removeChild(element);
+        }
+
+        // Trigger file input
+        function triggerFileUpload() {
+            document.getElementById('loadFileInput').click();
+        }
+
+        // Load backup from .txt file
+        function loadBackup(event) {
+            const file = event.target.files[0];
+            if (!file) return;
+
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                try {
+                    const loadedEntries = JSON.parse(e.target.result);
+                    
+                    // Validate the loaded data
+                    if (typeof loadedEntries !== 'object' || loadedEntries === null) {
+                        throw new Error('Invalid backup format');
+                    }
+
+                    // Ask for confirmation
+                    const confirmLoad = confirm('⚠️ This will load all entries from the backup file. Continue? Your current entries will be replaced.');
+                    
+                    if (confirmLoad) {
+                        entries = loadedEntries;
+                        localStorage.setItem('weeklyEntries', JSON.stringify(entries));
+                        displayContent();
+                        alert('✅ Backup loaded successfully!');
+                    }
+                } catch (error) {
+                    alert('❌ Error loading backup: Invalid file format. Please ensure you\'re loading a valid backup file.');
+                }
+            };
+            reader.readAsText(file);
+
+            // Reset file input
+            event.target.value = '';
         }
 
         // Close modal when clicking outside
