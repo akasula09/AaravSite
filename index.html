@@ -18,6 +18,12 @@
             padding: 40px 20px;
         }
 
+        body.locked {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
         .container {
             max-width: 1200px;
             margin: 0 auto;
@@ -218,6 +224,27 @@
             box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
         }
 
+        .logout-button {
+            position: fixed;
+            top: 20px;
+            right: 20px;
+            background: rgba(231, 76, 60, 0.8);
+            color: white;
+            border: none;
+            padding: 10px 20px;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 0.9em;
+            transition: all 0.3s;
+            z-index: 500;
+        }
+
+        .logout-button:hover {
+            background: rgba(231, 76, 60, 1);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(231, 76, 60, 0.4);
+        }
+
         /* Modal */
         .modal {
             display: none;
@@ -310,6 +337,96 @@
             text-align: center;
         }
 
+        /* Master Password Lock Screen */
+        .master-lock-screen {
+            display: none;
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            top: 0;
+            left: 0;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            z-index: 2000;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .master-lock-screen.active {
+            display: flex;
+        }
+
+        .lock-container {
+            background: white;
+            padding: 50px;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            max-width: 450px;
+            width: 90%;
+            text-align: center;
+            animation: slideUp 0.5s ease-out;
+        }
+
+        .lock-container h2 {
+            color: #667eea;
+            font-size: 2em;
+            margin-bottom: 20px;
+        }
+
+        .lock-container p {
+            color: #666;
+            font-size: 1.1em;
+            margin-bottom: 30px;
+            line-height: 1.6;
+        }
+
+        .lock-input {
+            width: 100%;
+            padding: 15px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            font-size: 1.1em;
+            margin-bottom: 20px;
+            transition: border-color 0.3s;
+        }
+
+        .lock-input:focus {
+            outline: none;
+            border-color: #667eea;
+        }
+
+        .lock-error {
+            color: #e74c3c;
+            font-size: 0.95em;
+            margin-bottom: 15px;
+        }
+
+        .lock-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+        }
+
+        .lock-button {
+            padding: 12px 30px;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-size: 1em;
+            font-weight: 600;
+            transition: all 0.3s;
+        }
+
+        .unlock-button {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            flex-grow: 1;
+        }
+
+        .unlock-button:hover {
+            transform: translateY(-2px);
+            box-shadow: 0 10px 25px rgba(102, 126, 234, 0.4);
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -350,11 +467,43 @@
                 padding: 15px;
                 min-width: 80px;
             }
+
+            .lock-container {
+                padding: 30px;
+            }
+
+            .lock-container h2 {
+                font-size: 1.6em;
+            }
+
+            .logout-button {
+                top: 10px;
+                right: 10px;
+                padding: 8px 15px;
+                font-size: 0.8em;
+            }
         }
     </style>
 </head>
 <body>
-    <div class="container">
+    <!-- Master Password Lock Screen -->
+    <div id="masterLockScreen" class="master-lock-screen active">
+        <div class="lock-container">
+            <div style="font-size: 3em; margin-bottom: 20px;">🔐</div>
+            <h2>My Weekly Journal</h2>
+            <p>This is a private journal. Please enter the master password to access.</p>
+            <input type="password" id="masterPasswordInput" class="lock-input" placeholder="Enter master password" autofocus>
+            <div id="lockError" class="lock-error"></div>
+            <div class="lock-buttons">
+                <button class="lock-button unlock-button" onclick="checkMasterPassword()">Unlock</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Logout Button -->
+    <button class="logout-button" id="logoutBtn" onclick="logout()" style="display: none;">🚪 Logout</button>
+
+    <div class="container" id="mainContent" style="display: none;">
         <div class="header">
             <h1>📓 My Weekly Journey</h1>
             <p>Preparing for the Future, One Week at a Time</p>
@@ -385,30 +534,12 @@
         </div>
     </div>
 
-    <!-- Modal for Password Protection -->
-    <div id="passwordModal" class="modal">
-        <div class="modal-content">
-            <div class="modal-header">🔐 Enter Password</div>
-            <p style="color: #666; margin-bottom: 15px;">This entry is password protected.</p>
-            <input type="password" id="passwordInput" class="modal-input" placeholder="Enter password">
-            <div id="passwordError"></div>
-            <div class="modal-buttons">
-                <button class="modal-button cancel-button" onclick="closePasswordModal()">Cancel</button>
-                <button class="modal-button save-button" onclick="checkPassword()">Unlock</button>
-            </div>
-        </div>
-    </div>
-
     <!-- Modal for Adding/Editing Entries -->
     <div id="addModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">✍️ Add Weekly Entry</div>
             <input type="text" id="entryTitle" class="modal-input" placeholder="What was this week about?">
             <textarea id="entryText" class="modal-textarea" placeholder="Write about your experiences, what you learned, what you did..."></textarea>
-            <label style="color: #667eea; font-weight: 600; display: block; margin-bottom: 10px;">
-                <input type="checkbox" id="protectEntry" style="margin-right: 8px;"> 🔐 Protect with password
-            </label>
-            <input type="password" id="entryPassword" class="modal-input" placeholder="Enter password (leave blank for no protection)" style="display: none;">
             <div class="modal-buttons">
                 <button class="modal-button cancel-button" onclick="closeAddModal()">Cancel</button>
                 <button class="modal-button save-button" onclick="saveEntry()">Save Entry</button>
@@ -417,23 +548,69 @@
     </div>
 
     <script>
+        // Master password - SET YOUR MASTER PASSWORD HERE
+        const MASTER_PASSWORD = 'myjournal123'; // Change this to your desired password
+
         // Data structure for storing entries
         let entries = JSON.parse(localStorage.getItem('weeklyEntries')) || {};
         let currentYear = 2026;
         let currentWeek = 1;
-        let passwordAttempt = null;
-        let currentPasswordKey = null;
+        let isUnlocked = false;
+
+        // Check if master password is correct
+        function checkMasterPassword() {
+            const password = document.getElementById('masterPasswordInput').value;
+            const errorDiv = document.getElementById('lockError');
+
+            if (password === MASTER_PASSWORD) {
+                isUnlocked = true;
+                localStorage.setItem('journalUnlocked', 'true');
+                document.getElementById('masterLockScreen').classList.remove('active');
+                document.getElementById('mainContent').style.display = 'block';
+                document.getElementById('logoutBtn').style.display = 'block';
+                init();
+            } else {
+                errorDiv.textContent = '❌ Incorrect password. Try again!';
+                document.getElementById('masterPasswordInput').value = '';
+            }
+        }
+
+        // Logout function
+        function logout() {
+            isUnlocked = false;
+            localStorage.removeItem('journalUnlocked');
+            document.getElementById('masterLockScreen').classList.add('active');
+            document.getElementById('mainContent').style.display = 'none';
+            document.getElementById('logoutBtn').style.display = 'none';
+            document.getElementById('masterPasswordInput').value = '';
+            document.getElementById('lockError').textContent = '';
+        }
+
+        // Check if already unlocked on page load
+        function checkUnlockStatus() {
+            if (localStorage.getItem('journalUnlocked') === 'true') {
+                isUnlocked = true;
+                document.getElementById('masterLockScreen').classList.remove('active');
+                document.getElementById('mainContent').style.display = 'block';
+                document.getElementById('logoutBtn').style.display = 'block';
+                init();
+            }
+        }
+
+        // Allow Enter key to unlock
+        document.addEventListener('DOMContentLoaded', function() {
+            document.getElementById('masterPasswordInput').addEventListener('keypress', function(event) {
+                if (event.key === 'Enter') {
+                    checkMasterPassword();
+                }
+            });
+        });
 
         // Initialize the interface
         function init() {
             generateYears();
             generateWeeks();
             displayContent();
-
-            // Show password field when checkbox is checked
-            document.getElementById('protectEntry').addEventListener('change', function() {
-                document.getElementById('entryPassword').style.display = this.checked ? 'block' : 'none';
-            });
         }
 
         // Generate year buttons
@@ -507,24 +684,13 @@
 
             if (entries[key]) {
                 const entry = entries[key];
-                
-                // Check if entry is password protected
-                if (entry.password) {
-                    contentDisplay.innerHTML = `
-                        <div class="empty-state">
-                            <p>🔒 This entry is password protected.</p>
-                            <button class="add-content-button" onclick="openPasswordModal('${key}')">🔓 Unlock to View</button>
-                        </div>
-                    `;
-                } else {
-                    contentDisplay.innerHTML = `
-                        <h3>${entry.title}</h3>
-                        <p>${entry.text}</p>
-                        ${entry.image ? `<img src="${entry.image}" alt="Week entry">` : ''}
-                        <button class="add-content-button" onclick="openEditModal('${key}')">✏️ Edit</button>
-                        <button class="add-content-button" style="background: #e74c3c; margin-left: 10px;" onclick="deleteEntry('${key}')">🗑️ Delete</button>
-                    `;
-                }
+                contentDisplay.innerHTML = `
+                    <h3>${entry.title}</h3>
+                    <p>${entry.text}</p>
+                    ${entry.image ? `<img src="${entry.image}" alt="Week entry">` : ''}
+                    <button class="add-content-button" onclick="openEditModal('${key}')">✏️ Edit</button>
+                    <button class="add-content-button" style="background: #e74c3c; margin-left: 10px;" onclick="deleteEntry('${key}')">🗑️ Delete</button>
+                `;
             } else {
                 contentDisplay.innerHTML = `
                     <div class="empty-state">
@@ -535,49 +701,11 @@
             }
         }
 
-        // Open password modal
-        function openPasswordModal(key) {
-            currentPasswordKey = key;
-            document.getElementById('passwordModal').style.display = 'block';
-            document.getElementById('passwordInput').value = '';
-            document.getElementById('passwordError').innerHTML = '';
-        }
-
-        // Close password modal
-        function closePasswordModal() {
-            document.getElementById('passwordModal').style.display = 'none';
-            currentPasswordKey = null;
-        }
-
-        // Check password
-        function checkPassword() {
-            const password = document.getElementById('passwordInput').value;
-            const entry = entries[currentPasswordKey];
-
-            if (password === entry.password) {
-                closePasswordModal();
-                const contentDisplay = document.getElementById('contentDisplay');
-                contentDisplay.innerHTML = `
-                    <h3>${entry.title}</h3>
-                    <p>${entry.text}</p>
-                    ${entry.image ? `<img src="${entry.image}" alt="Week entry">` : ''}
-                    <button class="add-content-button" onclick="openEditModal('${currentPasswordKey}')">✏️ Edit</button>
-                    <button class="add-content-button" style="background: #e74c3c; margin-left: 10px;" onclick="deleteEntry('${currentPasswordKey}')">🗑️ Delete</button>
-                `;
-            } else {
-                document.getElementById('passwordError').innerHTML = '<div class="error-message">❌ Incorrect password. Try again!</div>';
-                document.getElementById('passwordInput').value = '';
-            }
-        }
-
         // Open modal for adding entry
         function openAddModal() {
             document.getElementById('addModal').style.display = 'block';
             document.getElementById('entryTitle').value = '';
             document.getElementById('entryText').value = '';
-            document.getElementById('entryPassword').value = '';
-            document.getElementById('protectEntry').checked = false;
-            document.getElementById('entryPassword').style.display = 'none';
         }
 
         // Open modal for editing entry
@@ -585,40 +713,33 @@
             const entry = entries[key];
             document.getElementById('entryTitle').value = entry.title;
             document.getElementById('entryText').value = entry.text;
-            document.getElementById('entryPassword').value = entry.password || '';
-            document.getElementById('protectEntry').checked = !!entry.password;
-            document.getElementById('entryPassword').style.display = entry.password ? 'block' : 'none';
+            document.getElementById('addModal').dataset.editKey = key;
             document.getElementById('addModal').style.display = 'block';
         }
 
         // Close modal
         function closeAddModal() {
             document.getElementById('addModal').style.display = 'none';
+            document.getElementById('addModal').dataset.editKey = '';
         }
 
         // Save entry
         function saveEntry() {
             const title = document.getElementById('entryTitle').value.trim();
             const text = document.getElementById('entryText').value.trim();
-            const isProtected = document.getElementById('protectEntry').checked;
-            const password = document.getElementById('entryPassword').value;
 
             if (!title || !text) {
                 alert('Please fill in both title and content!');
                 return;
             }
 
-            if (isProtected && !password) {
-                alert('Please enter a password to protect this entry!');
-                return;
-            }
+            const editKey = document.getElementById('addModal').dataset.editKey;
+            const key = editKey || `${currentYear}-${currentWeek}`;
 
-            const key = `${currentYear}-${currentWeek}`;
             entries[key] = {
                 title: title,
                 text: text,
-                image: entries[key]?.image || null,
-                password: isProtected ? password : null
+                image: entries[key]?.image || null
             };
 
             localStorage.setItem('weeklyEntries', JSON.stringify(entries));
@@ -638,12 +759,8 @@
         // Close modal when clicking outside
         window.onclick = function(event) {
             const addModal = document.getElementById('addModal');
-            const passwordModal = document.getElementById('passwordModal');
             if (event.target === addModal) {
                 addModal.style.display = 'none';
-            }
-            if (event.target === passwordModal) {
-                passwordModal.style.display = 'none';
             }
         }
 
@@ -652,8 +769,8 @@
             document.querySelector('.section-title').scrollIntoView({ behavior: 'smooth' });
         }
 
-        // Initialize on page load
-        init();
+        // Check unlock status on page load
+        checkUnlockStatus();
     </script>
 </body>
 </html>
