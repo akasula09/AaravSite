@@ -303,6 +303,13 @@
             background: #ccc;
         }
 
+        .error-message {
+            color: #e74c3c;
+            font-size: 0.9em;
+            margin-top: 10px;
+            text-align: center;
+        }
+
         @keyframes fadeIn {
             from { opacity: 0; }
             to { opacity: 1; }
@@ -378,12 +385,30 @@
         </div>
     </div>
 
+    <!-- Modal for Password Protection -->
+    <div id="passwordModal" class="modal">
+        <div class="modal-content">
+            <div class="modal-header">🔐 Enter Password</div>
+            <p style="color: #666; margin-bottom: 15px;">This entry is password protected.</p>
+            <input type="password" id="passwordInput" class="modal-input" placeholder="Enter password">
+            <div id="passwordError"></div>
+            <div class="modal-buttons">
+                <button class="modal-button cancel-button" onclick="closePasswordModal()">Cancel</button>
+                <button class="modal-button save-button" onclick="checkPassword()">Unlock</button>
+            </div>
+        </div>
+    </div>
+
     <!-- Modal for Adding/Editing Entries -->
     <div id="addModal" class="modal">
         <div class="modal-content">
             <div class="modal-header">✍️ Add Weekly Entry</div>
             <input type="text" id="entryTitle" class="modal-input" placeholder="What was this week about?">
             <textarea id="entryText" class="modal-textarea" placeholder="Write about your experiences, what you learned, what you did..."></textarea>
+            <label style="color: #667eea; font-weight: 600; display: block; margin-bottom: 10px;">
+                <input type="checkbox" id="protectEntry" style="margin-right: 8px;"> 🔐 Protect with password
+            </label>
+            <input type="password" id="entryPassword" class="modal-input" placeholder="Enter password (leave blank for no protection)" style="display: none;">
             <div class="modal-buttons">
                 <button class="modal-button cancel-button" onclick="closeAddModal()">Cancel</button>
                 <button class="modal-button save-button" onclick="saveEntry()">Save Entry</button>
@@ -396,12 +421,19 @@
         let entries = JSON.parse(localStorage.getItem('weeklyEntries')) || {};
         let currentYear = 2026;
         let currentWeek = 1;
+        let passwordAttempt = null;
+        let currentPasswordKey = null;
 
         // Initialize the interface
         function init() {
             generateYears();
             generateWeeks();
             displayContent();
+
+            // Show password field when checkbox is checked
+            document.getElementById('protectEntry').addEventListener('change', function() {
+                document.getElementById('entryPassword').style.display = this.checked ? 'block' : 'none';
+            });
         }
 
         // Generate year buttons
@@ -475,13 +507,24 @@
 
             if (entries[key]) {
                 const entry = entries[key];
-                contentDisplay.innerHTML = `
-                    <h3>${entry.title}</h3>
-                    <p>${entry.text}</p>
-                    ${entry.image ? `<img src="${entry.image}" alt="Week entry">` : ''}
-                    <button class="add-content-button" onclick="openEditModal('${key}')">✏️ Edit</button>
-                    <button class="add-content-button" style="background: #e74c3c; margin-left: 10px;" onclick="deleteEntry('${key}')">🗑️ Delete</button>
-                `;
+                
+                // Check if entry is password protected
+                if (entry.password) {
+                    contentDisplay.innerHTML = `
+                        <div class="empty-state">
+                            <p>🔒 This entry is password protected.</p>
+                            <button class="add-content-button" onclick="openPasswordModal('${key}')">🔓 Unlock to View</button>
+                        </div>
+                    `;
+                } else {
+                    contentDisplay.innerHTML = `
+                        <h3>${entry.title}</h3>
+                        <p>${entry.text}</p>
+                        ${entry.image ? `<img src="${entry.image}" alt="Week entry">` : ''}
+                        <button class="add-content-button" onclick="openEditModal('${key}')">✏️ Edit</button>
+                        <button class="add-content-button" style="background: #e74c3c; margin-left: 10px;" onclick="deleteEntry('${key}')">🗑️ Delete</button>
+                    `;
+                }
             } else {
                 contentDisplay.innerHTML = `
                     <div class="empty-state">
@@ -492,11 +535,49 @@
             }
         }
 
+        // Open password modal
+        function openPasswordModal(key) {
+            currentPasswordKey = key;
+            document.getElementById('passwordModal').style.display = 'block';
+            document.getElementById('passwordInput').value = '';
+            document.getElementById('passwordError').innerHTML = '';
+        }
+
+        // Close password modal
+        function closePasswordModal() {
+            document.getElementById('passwordModal').style.display = 'none';
+            currentPasswordKey = null;
+        }
+
+        // Check password
+        function checkPassword() {
+            const password = document.getElementById('passwordInput').value;
+            const entry = entries[currentPasswordKey];
+
+            if (password === entry.password) {
+                closePasswordModal();
+                const contentDisplay = document.getElementById('contentDisplay');
+                contentDisplay.innerHTML = `
+                    <h3>${entry.title}</h3>
+                    <p>${entry.text}</p>
+                    ${entry.image ? `<img src="${entry.image}" alt="Week entry">` : ''}
+                    <button class="add-content-button" onclick="openEditModal('${currentPasswordKey}')">✏️ Edit</button>
+                    <button class="add-content-button" style="background: #e74c3c; margin-left: 10px;" onclick="deleteEntry('${currentPasswordKey}')">🗑️ Delete</button>
+                `;
+            } else {
+                document.getElementById('passwordError').innerHTML = '<div class="error-message">❌ Incorrect password. Try again!</div>';
+                document.getElementById('passwordInput').value = '';
+            }
+        }
+
         // Open modal for adding entry
         function openAddModal() {
             document.getElementById('addModal').style.display = 'block';
             document.getElementById('entryTitle').value = '';
             document.getElementById('entryText').value = '';
+            document.getElementById('entryPassword').value = '';
+            document.getElementById('protectEntry').checked = false;
+            document.getElementById('entryPassword').style.display = 'none';
         }
 
         // Open modal for editing entry
@@ -504,6 +585,9 @@
             const entry = entries[key];
             document.getElementById('entryTitle').value = entry.title;
             document.getElementById('entryText').value = entry.text;
+            document.getElementById('entryPassword').value = entry.password || '';
+            document.getElementById('protectEntry').checked = !!entry.password;
+            document.getElementById('entryPassword').style.display = entry.password ? 'block' : 'none';
             document.getElementById('addModal').style.display = 'block';
         }
 
@@ -516,9 +600,16 @@
         function saveEntry() {
             const title = document.getElementById('entryTitle').value.trim();
             const text = document.getElementById('entryText').value.trim();
+            const isProtected = document.getElementById('protectEntry').checked;
+            const password = document.getElementById('entryPassword').value;
 
             if (!title || !text) {
                 alert('Please fill in both title and content!');
+                return;
+            }
+
+            if (isProtected && !password) {
+                alert('Please enter a password to protect this entry!');
                 return;
             }
 
@@ -526,7 +617,8 @@
             entries[key] = {
                 title: title,
                 text: text,
-                image: entries[key]?.image || null
+                image: entries[key]?.image || null,
+                password: isProtected ? password : null
             };
 
             localStorage.setItem('weeklyEntries', JSON.stringify(entries));
@@ -545,9 +637,13 @@
 
         // Close modal when clicking outside
         window.onclick = function(event) {
-            const modal = document.getElementById('addModal');
-            if (event.target === modal) {
-                modal.style.display = 'none';
+            const addModal = document.getElementById('addModal');
+            const passwordModal = document.getElementById('passwordModal');
+            if (event.target === addModal) {
+                addModal.style.display = 'none';
+            }
+            if (event.target === passwordModal) {
+                passwordModal.style.display = 'none';
             }
         }
 
